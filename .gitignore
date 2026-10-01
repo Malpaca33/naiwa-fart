@@ -1,0 +1,21 @@
+# 历史版本备份（本地留档，不进仓库）
+.bak_*.html
+
+# 构建产物：由 tools/build.sh 生成
+public/
+
+# Cloudflare 本地缓存（含账号信息）
+.wrangler/
+
+# 依赖
+node_modules/
+
+# 素材处理的中间产物
+assets/appicon/_master.png
+assets/src/_*.png
+
+# 打包临时文件
+*.zip
+
+# 系统文件
+.DS_Store

@@ -1,0 +1,58 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>奶蛙玩法效果预览</title>
+<style>html,body{margin:0;width:1280px;height:720px;overflow:hidden;background:#eef2f7}canvas{display:block}</style>
+<canvas id="sheet" width="1280" height="720"></canvas>
+<script>
+const ctx=document.getElementById('sheet').getContext('2d');
+const scene=new URL(location.href).searchParams.get('scene')||'cutout';
+const paths={frog:'../assets/src/player_idle.png',eggBack:'../assets/src/egg_back.png',eggFront:'../assets/src/egg_front.png',eggSide:'../assets/src/egg_side.png'};
+const im={};
+Promise.all(Object.entries(paths).map(([k,p])=>new Promise(resolve=>{let a=new Image();a.onload=()=>{im[k]=a;resolve()};a.onerror=resolve;a.src=p}))).then(draw);
+function round(x,y,w,h,r,fill,stroke){ctx.beginPath();ctx.roundRect(x,y,w,h,r);if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke()}}
+function label(t,x,y,size=21,color='#172334',weight='700'){ctx.font=`${weight} ${size}px -apple-system,'PingFang SC',sans-serif`;ctx.fillStyle=color;ctx.textBaseline='middle';ctx.fillText(t,x,y)}
+function clear(){ctx.fillStyle='#eef2f7';ctx.fillRect(0,0,1280,720)}
+function imageAt(img,x,y,h){if(!img)return {x,y,w:0,h};const w=h*img.width/img.height;ctx.drawImage(img,x,y,w,h);return{x,y,w,h}}
+function header(title,desc){clear();label(title,42,41,29);label(desc,43,77,16,'#657486','500')}
+function card(x,y,w,h,title,subtitle){round(x,y,w,h,24,'#fff','#dae2ea');label(title,x+24,y+31,23);if(subtitle)label(subtitle,x+24,y+61,15,'#68798b','500')}
+function drawGround(x,y,w){ctx.strokeStyle='#ced9e2';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+w,y);ctx.stroke()}
+function drawHud(x,y,w,tier,wind=false){round(x,y,w,52,12,wind?'#e4f8ed':'#f3f7fa','#d7e1e8');label(wind?'🌬 风来了，放心放！':(tier===1?'？  奶蛋好像听见了':tier===2?'↶  奶蛋转身了':'⌕  奶蛋正在扫描'),x+17,y+26,18,wind?'#087e58':'#314254');for(let i=0;i<5;i++)round(x+16+i*36,y+63,31,9,3,i<tier?['#41c878','#9ec83e','#edbf43','#f59443','#ee6767'][i]:'#dbe4ec')}
+function oldBeam(from,to){ctx.fillStyle='rgba(195,78,82,.27)';ctx.beginPath();ctx.moveTo(from.x,from.y);ctx.lineTo(to.x,to.y-85);ctx.lineTo(to.x,to.y+85);ctx.closePath();ctx.fill()}
+function softBeam(from,to,tier){
+ const col=tier>=5?[239,73,75]:tier===4?[245,124,48]:[249,179,61];
+ for(let layer=11;layer>=0;layer--){const half=14+layer*5.6;const alpha=layer===0?.18:.014;const grad=ctx.createLinearGradient(from.x,from.y,to.x,to.y);grad.addColorStop(0,`rgba(${col},.04)`);grad.addColorStop(.30,`rgba(${col},${alpha})`);grad.addColorStop(.82,`rgba(${col},${alpha})`);grad.addColorStop(1,`rgba(${col},0)`);ctx.fillStyle=grad;ctx.beginPath();ctx.moveTo(from.x,from.y-4);ctx.lineTo(to.x,to.y-half);ctx.quadraticCurveTo(to.x-32,to.y,to.x,to.y+half);ctx.lineTo(from.x,from.y+4);ctx.closePath();ctx.fill()}
+ let g=ctx.createRadialGradient(to.x,to.y,0,to.x,to.y,55);g.addColorStop(0,`rgba(${col},.18)`);g.addColorStop(1,`rgba(${col},0)`);ctx.fillStyle=g;ctx.beginPath();ctx.arc(to.x,to.y,55,0,Math.PI*2);ctx.fill();ctx.strokeStyle=`rgba(${col},.43)`;ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(to.x,to.y,26,34,0,0,Math.PI*2);ctx.stroke()
+}
+function gameplay(x,y,w,h,opt={}){
+ ctx.save();ctx.beginPath();ctx.roundRect(x,y,w,h,18);ctx.clip();ctx.fillStyle=opt.blue?'#d9f0fc':'#ffffff';ctx.fillRect(x,y,w,h);const ground=y+h*.83;drawGround(x+10,ground,w-20);
+ const fh=opt.frogH||Math.min(285,h*.53);const fw=fh*im.frog.width/im.frog.height;const fx=x+w*.29-fw*.5;const fy=ground-fh;
+ const egg=im[opt.egg||'eggSide'];const eh=opt.eggH||Math.min(280,h*.52),ew=eh*egg.width/egg.height;const ex=x+w*.76-ew*.5,ey=ground-eh;
+ if(opt.beam){const from={x:ex+ew*.30,y:ey+eh*.39},to={x:fx+fw*.66,y:fy+fh*.45};opt.beam==='old'?oldBeam(from,to):softBeam(from,to,opt.tier||3)}
+ imageAt(im.frog,fx,fy,fh);imageAt(egg,ex,ey,eh);if(opt.mark){label(opt.mark,x+w*.76-12,ey-23,47,opt.mark==='？'?'#e6a31c':'#e95344')}
+ ctx.restore();return{x,y,w,h}
+}
+function checker(x,y,w,h){ctx.fillStyle='#fff';ctx.fillRect(x,y,w,h);for(let yy=y;yy<y+h;yy+=20)for(let xx=x;xx<x+w;xx+=20)if(((xx-x)/20+(yy-y)/20)%2===0){ctx.fillStyle='#e5e9ec';ctx.fillRect(xx,yy,20,20)}}
+function fogCloud(x,y,r,a,color){let g=ctx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,`rgba(${color},${a})`);g.addColorStop(.46,`rgba(${color},${a*.47})`);g.addColorStop(1,`rgba(${color},0)`);ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill()}
+function fog(x,y,w,h,wind){ctx.save();ctx.beginPath();ctx.roundRect(x,y,w,h,18);ctx.clip();const shift=wind?75:0;let colors=['104,187,54','51,171,80','164,209,58','35,139,84'];for(let i=0;i<22;i++){let px=x+w*(.11+((i*37)%79)/100)+shift,py=y+h*(.19+((i*23)%76)/100);fogCloud(px,py,wind?105:136,wind?.17:.33,colors[i%4])}ctx.restore()}
+function draw(){
+ if(scene==='cutout'){
+  header('01  奶蛙透明抠图检查','同一张透明素材分别放在棋盘格、游戏浅蓝底；原 JPG 保留。');
+  card(35,105,590,570,'透明边缘 · 棋盘格','检查头顶、绿色眼圈、手指和脚趾');card(655,105,590,570,'浅蓝背景 · 游戏尺寸','检查白边、脚边阴影与角色大小');
+  ctx.save();ctx.beginPath();ctx.roundRect(53,184,554,465,14);ctx.clip();checker(53,184,554,465);imageAt(im.frog,205,188,448);ctx.restore();
+  round(673,184,554,465,14,'#d9f0fc');imageAt(im.frog,825,188,448);
+ }else if(scene==='alert'){
+  header('02  奶蛋警觉 · 从问号到扫描','动作跟顶部五格同步；第三档开始扫描，保留松手反应窗口。');
+  const cols=[{x:25,t:1,egg:'eggBack',mark:'？',title:'第一档 · 听见动静'},{x:435,t:2,egg:'eggFront',title:'第二档 · 转身确认'},{x:845,t:3,egg:'eggSide',beam:'soft',title:'第三档 · 扫描'}];
+  for(const c of cols){card(c.x,112,390,566,c.title);drawHud(c.x+20,166,350,c.t);gameplay(c.x+14,259,362,398,{egg:c.egg,mark:c.mark,beam:c.beam,tier:c.t,frogH:205,eggH:200})}
+ }else if(scene==='scan'){
+  header('03  扫描特写 · 旧版与改进版','光从奶蛋眼睛附近出发，柔和边缘和落点随角色位置移动。');
+  card(30,112,595,567,'现有扫描','固定红色三角形，上下摆动');card(655,112,595,567,'柔和探照光','三档暖黄，四五档逐渐转为橙红');
+  gameplay(47,181,562,475,{beam:'old',frogH:295,eggH:285});gameplay(672,181,562,475,{beam:'soft',tier:3,frogH:295,eggH:285});
+ }else if(scene==='wind'){
+  header('04  绿雾与风 · 前后对照','近 4000 ml 时烟团浓淡不均；起风后吹开一部分，累计得分保留。');
+  card(30,108,595,572,'风前 · 残留浓度约 3800 ml','烟团积在奶蛙附近，视野渐窄');card(655,108,595,572,'起风中 · 绿雾被吹散','风浪提示可安全排气，烟向右卷开');
+  drawHud(49,195,557,3);drawHud(674,195,557,0,true);
+  gameplay(47,275,562,380,{frogH:235,eggH:225});fog(47,275,562,380,false);
+  gameplay(672,275,562,380,{frogH:235,eggH:225});fog(672,275,562,380,true);
+ }
+ document.body.dataset.ready='1';
+}
+</script></html>

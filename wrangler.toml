@@ -1,0 +1,10 @@
+# Cloudflare Pages 配置
+# 直传（Direct Upload）模式下，这个文件同时负责声明 Functions 的 KV 绑定。
+name = "naiwa-fart"
+pages_build_output_dir = "public"
+compatibility_date = "2026-10-01"
+
+# 玩家人次计数器用的 KV 命名空间
+[[kv_namespaces]]
+binding = "PLAY_COUNTER"
+id = "01e0d40dd26241728f478c9a55747530"
