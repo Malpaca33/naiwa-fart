@@ -577,6 +577,7 @@
         </div>
         <p class="name-feedback" id="board-name-feedback">留名后，成绩会显示在你的名字下</p>
       </div>
+      <p class="sheet-subtitle" id="board-status" aria-live="polite">前 10 名约 5 分钟更新</p>
       <div id="leaderboard-list" aria-live="polite"><div class="board-empty">读取中…</div></div>
       <div class="my-rank" id="my-rank">我的排名：读取中…</div>
     </div>
@@ -1169,9 +1170,9 @@ async function submitLeaderboard(finalScore) {
       try { board = await boardRequest({ action: 'rename', playerId, name: playerName }); }
       catch (_) { nameSyncFailed = true; }
     }
-    notice.textContent = board.mine
+    notice.textContent = board.mine && !board.mineStale
       ? `${nameSyncFailed ? submittedName : playerName}，你的最高成绩排第 ${board.mine.rank} 名${nameSyncFailed ? '（改名待同步）' : ''}`
-      : '成绩已记录';
+      : '成绩已保存，排名稍后更新';
     pendingScore = null;
     document.getElementById('result-name-form').hidden = true;
     if (document.getElementById('leaderboard-modal').classList.contains('open')) renderLeaderboard(board);
@@ -1205,7 +1206,8 @@ async function savePlayerName(input, feedback) {
   try {
     const board = await boardRequest({ action: 'rename', playerId, name });
     if (document.getElementById('leaderboard-modal').classList.contains('open')) renderLeaderboard(board);
-    feedback.textContent = board.mine ? '榜上名字已更新' : '结算后会用这个名字上榜';
+    feedback.textContent = board.mineUnavailable ? '名字已更新，排名稍后更新'
+      : board.mine ? '榜上名字已更新' : '结算后会用这个名字上榜';
   } catch (_) {
     feedback.textContent = '已在本机保存，联网后随成绩更新';
   }
@@ -1224,12 +1226,17 @@ for (const id of ['board-name', 'result-name']) {
 }
 
 function renderLeaderboard(board) {
+  const status = document.getElementById('board-status');
+  status.textContent = board.stale && board.cachedAt
+    ? `显示上次榜单（${new Date(board.cachedAt * 1000).toLocaleString('zh-CN', { hour12: false })}），暂未更新`
+    : '前 10 名约 5 分钟更新；成绩提交成功后即保存';
   const list = document.getElementById('leaderboard-list');
   list.replaceChildren();
-  if (!board.top || board.top.length === 0) {
+  if (board.topUnavailable || !board.top || board.top.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'board-empty';
-    empty.textContent = '还没有成绩，等你来占第一名。';
+    empty.textContent = board.topUnavailable ? '成绩已保存，榜单暂时无法读取'
+      : '还没有成绩，等你来占第一名。';
     list.appendChild(empty);
   } else {
     for (const entry of board.top) {
@@ -1245,20 +1252,24 @@ function renderLeaderboard(board) {
     }
   }
   document.getElementById('my-rank').textContent = board.mine
-    ? `我的最高：${Number(board.mine.score).toLocaleString()} ml · 第 ${board.mine.rank} 名`
-    : '我的排名：完成一局后出现';
+    ? `我的最高：${Number(board.mine.score).toLocaleString()} ml · 第 ${board.mine.rank} 名${board.mineStale ? '（上次排名）' : ''}`
+    : board.mineUnavailable ? '我的排名暂时无法更新'
+      : '我的排名：完成一局后出现';
 }
 
 async function loadLeaderboard() {
   document.getElementById('leaderboard-list').textContent = '读取中…';
   document.getElementById('my-rank').textContent = '我的排名：读取中…';
+  document.getElementById('board-status').textContent = '前 10 名约 5 分钟更新';
   try {
     const response = await fetch(`/api/leaderboard?playerId=${encodeURIComponent(playerId)}`, { cache: 'no-store' });
-    if (!response.ok) throw new Error('读取失败');
-    renderLeaderboard(await response.json());
-  } catch (_) {
+    const board = await response.json();
+    if (!response.ok) throw new Error(board.error || '排行榜暂时无法读取');
+    renderLeaderboard(board);
+  } catch (error) {
     document.getElementById('leaderboard-list').textContent = '排行榜暂时无法读取';
-    document.getElementById('my-rank').textContent = '网络恢复后再来看看';
+    document.getElementById('board-status').textContent = error.message;
+    document.getElementById('my-rank').textContent = '稍后重新打开排行榜重试';
   }
 }
 

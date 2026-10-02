@@ -4,7 +4,7 @@ name = "naiwa-fart"
 pages_build_output_dir = "public"
 compatibility_date = "2026-10-01"
 
-# 玩家人次计数器用的 KV 命名空间
+# 到访计数（total）及排行榜快照（leaderboard:top:v1）；两者使用独立键。
 [[kv_namespaces]]
 binding = "PLAY_COUNTER"
 id = "01e0d40dd26241728f478c9a55747530"
