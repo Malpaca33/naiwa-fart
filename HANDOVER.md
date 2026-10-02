@@ -64,6 +64,7 @@ naiwa-fart/
 ├── functions/api/plays.js   # 计数接口（Pages Function）
 ├── functions/api/leaderboard.js # 排行榜接口（Pages Function）
 ├── migrations/0001_leaderboard.sql # D1 建表
+├── migrations/0002_player_names.sql # 排行榜名字字段
 ├── wrangler.toml            # Pages 配置与 KV、D1 绑定
 ├── assets/
 │   ├── *.webp               # 内嵌用的压缩素材
@@ -388,13 +389,14 @@ io.open('/tmp/gc.js','w',encoding='utf-8').write(re.findall(r'<script>(.*?)</scr
 
 ### 7.8 排行榜与角色解锁（2026-10-02）
 
-排行榜接口在 `functions/api/leaderboard.js`，绑定 `LEADERBOARD_DB`。D1 表结构在 `migrations/0001_leaderboard.sql`。线上库名 `naiwa-fart-leaderboard`，已应用第一版迁移；新环境首次部署前先运行 `npx --yes wrangler@4 d1 migrations apply naiwa-fart-leaderboard --remote`。
+排行榜接口在 `functions/api/leaderboard.js`，绑定 `LEADERBOARD_DB`。D1 表结构在 `migrations/0001_leaderboard.sql`，名字字段在 `migrations/0002_player_names.sql`。线上库名 `naiwa-fart-leaderboard`；新环境首次部署前运行 `npx --yes wrangler@4 d1 migrations apply naiwa-fart-leaderboard --remote`。
 
-- `POST /api/leaderboard` 的 `action: "start"` 发一枚本局令牌；结算时 `action: "submit"` 携令牌、匿名浏览器 ID 和整数分数。令牌只能提交一次，服务端按本局经过的真实时间校验最高理论分数。
-- `GET /api/leaderboard?playerId=...` 返回前 10 名以及这个浏览器自己的最高分和排名。每个匿名 ID 只保留最高分；同分并列。页面不收集昵称，公开显示「奶家人」加 ID 前六位。
-- `naiwa.playerId`、`naiwa.bestScore`、`naiwa.activeSkin` 放在浏览器 `localStorage`。清理浏览器网站数据会丢失本机解锁和匿名身份；换设备也不会同步。离线单文件仍可玩，只是排行榜和到访接口不可用。
+- `POST /api/leaderboard` 的 `action: "start"` 发一枚本局令牌；结算时 `action: "submit"` 携令牌、浏览器 ID、玩家名字和整数分数。令牌只能提交一次，服务端按本局经过的真实时间校验最高理论分数。没留名字时，结算页先显示输入框，不自动上传。
+- `POST /api/leaderboard` 的 `action: "rename"` 用浏览器 ID 更新已上榜记录的名字；没有历史记录时，名字先留在本机，结算上传时使用。
+- `GET /api/leaderboard?playerId=...` 返回前 10 名以及这个浏览器自己的最高分和排名。每个 ID 只保留最高分；同分并列。名字限 1～12 个字、字母、数字、空格、下划线或连字符，页面以 `textContent` 显示。未留名的旧记录仍显示「奶家人」加 ID 前六位。
+- `naiwa.playerId`、`naiwa.playerName`、`naiwa.bestScore`、`naiwa.activeSkin` 放在浏览器 `localStorage`。清理浏览器网站数据会丢失本机解锁和身份；换设备也不会同步。离线单文件仍可玩，只是排行榜和到访接口不可用。
 - 角色窗口用现有四套形象，按 666／1000／2026／4399 ml 对应「无声屁徒／连环屁王／单人乐队／人间大炮」解锁。未解锁角色显示灰色轮廓和锁，解锁后可以选用；角色属性尚未加入。
-- 角色与排行榜窗口打开时暂停本局，关闭后继续。结算后也能进入两个窗口。异常网络下会显示状态，不阻止重开。
+- 角色与排行榜窗口打开时暂停本局，关闭后继续。结算页只保留排行榜入口。底部两个入口改成大字纯文字。异常网络下会显示状态，不阻止重开。
 
 这个排行榜面向轻量娱乐，没有账号和强反作弊。令牌与分数上限可以过滤重复提交和离谱数值，但不能防止用户修改浏览器脚本后提交看似合理的分数。不要用于奖品、奖金或正式竞赛。
 

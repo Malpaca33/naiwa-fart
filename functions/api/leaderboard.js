@@ -14,22 +14,28 @@ function publicName(playerId) {
   return `奶家人 ${playerId.slice(0, 6).toUpperCase()}`;
 }
 
+function cleanName(value) {
+  if (typeof value !== 'string') return null;
+  const name = value.trim().replace(/\s+/g, ' ');
+  return /^[\p{L}\p{N}_ -]{1,12}$/u.test(name) ? name : null;
+}
+
 async function readBoard(db, playerId) {
   const top = await db.prepare(
-    `SELECT player_id, score, RANK() OVER (ORDER BY score DESC) AS rank
+    `SELECT player_id, name, score, RANK() OVER (ORDER BY score DESC) AS rank
      FROM leaderboard_scores ORDER BY score DESC, achieved_at ASC LIMIT 10`
   ).all();
   let mine = null;
   if (isUuid(playerId)) {
     const row = await db.prepare(
-      'SELECT score, (SELECT COUNT(*) + 1 FROM leaderboard_scores WHERE score > s.score) AS rank FROM leaderboard_scores s WHERE player_id = ?'
+      'SELECT name, score, (SELECT COUNT(*) + 1 FROM leaderboard_scores WHERE score > s.score) AS rank FROM leaderboard_scores s WHERE player_id = ?'
     ).bind(playerId).first();
-    if (row) mine = { score: row.score, rank: row.rank };
+    if (row) mine = { name: row.name || publicName(playerId), score: row.score, rank: row.rank };
   }
   return {
     top: (top.results || []).map((row) => ({
       rank: row.rank,
-      name: publicName(row.player_id),
+      name: row.name || publicName(row.player_id),
       score: row.score,
       mine: row.player_id === playerId,
     })),
@@ -65,8 +71,17 @@ export async function onRequest(context) {
       ).bind(token).run();
       return json({ token });
     }
+    if (body.action === 'rename') {
+      const name = cleanName(body.name);
+      if (!isUuid(body.playerId) || !name) return json({ error: '名字只能用 1～12 个字、字母或数字' }, 400);
+      await env.LEADERBOARD_DB.prepare(
+        'UPDATE leaderboard_scores SET name = ? WHERE player_id = ?'
+      ).bind(name, body.playerId).run();
+      return json(await readBoard(env.LEADERBOARD_DB, body.playerId));
+    }
     if (body.action !== 'submit' || !isUuid(body.token) || !isUuid(body.playerId)
-        || !Number.isSafeInteger(body.score) || body.score < 0 || body.score > 1000000) {
+        || !cleanName(body.name) || !Number.isSafeInteger(body.score)
+        || body.score < 0 || body.score > 1000000) {
       return json({ error: '成绩格式错误' }, 400);
     }
 
@@ -86,10 +101,12 @@ export async function onRequest(context) {
     if (claimed.meta.changes !== 1) return json({ error: '本局成绩已提交' }, 409);
 
     await env.LEADERBOARD_DB.prepare(
-      `INSERT INTO leaderboard_scores (player_id, score, achieved_at) VALUES (?, ?, unixepoch())
-       ON CONFLICT(player_id) DO UPDATE SET score = excluded.score, achieved_at = excluded.achieved_at
-       WHERE excluded.score > leaderboard_scores.score`
-    ).bind(body.playerId, body.score).run();
+      `INSERT INTO leaderboard_scores (player_id, name, score, achieved_at) VALUES (?, ?, ?, unixepoch())
+       ON CONFLICT(player_id) DO UPDATE SET
+         name = excluded.name,
+         achieved_at = CASE WHEN excluded.score > leaderboard_scores.score THEN excluded.achieved_at ELSE leaderboard_scores.achieved_at END,
+         score = MAX(leaderboard_scores.score, excluded.score)`
+    ).bind(body.playerId, cleanName(body.name), body.score).run();
     return json(await readBoard(env.LEADERBOARD_DB, body.playerId));
   } catch (error) {
     console.error('leaderboard error', error);

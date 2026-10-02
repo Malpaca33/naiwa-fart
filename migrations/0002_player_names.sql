@@ -1,0 +1,1 @@
+ALTER TABLE leaderboard_scores ADD COLUMN name TEXT NOT NULL DEFAULT '';

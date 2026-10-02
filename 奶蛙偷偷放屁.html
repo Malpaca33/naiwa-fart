@@ -351,19 +351,28 @@
       min-width: 0;
       flex: 1;
       max-width: 180px;
-      padding: 7px 10px;
-      border-radius: 16px;
+      min-height: 43px;
+      padding: 8px 12px;
+      border-radius: 14px;
       background: #f1f5f9;
       border: 1.5px solid #cbd5e1;
       color: #334155;
-      font-size: 12.5px;
-      font-weight: 800;
+      font-size: 17px;
+      font-weight: 900;
       cursor: pointer;
     }
     .menu-btn:active { background: #dbeafe; }
     .result-notice { font-size: 12px; font-weight: 800; color: #047857; min-height: 18px; margin: -10px 0 10px; }
     .result-notice.muted { color: #64748b; }
     .result-actions { margin: -8px 0 12px; }
+    .result-actions .menu-btn { max-width: none; }
+    .name-form { margin: 12px 0; text-align: left; }
+    .name-form label { display: block; font-size: 13px; font-weight: 800; color: #334155; margin-bottom: 6px; }
+    .name-entry { display: flex; gap: 7px; }
+    .name-entry input { flex: 1; min-width: 0; border: 1.5px solid #cbd5e1; border-radius: 10px; padding: 9px 10px; font-size: 16px; color: #0f172a; user-select: text; }
+    .name-entry input:focus { outline: 2px solid #38bdf8; outline-offset: 1px; }
+    .name-entry button { border: 0; border-radius: 10px; padding: 8px 12px; background: #10b981; color: #fff; font-size: 14px; font-weight: 900; white-space: nowrap; cursor: pointer; }
+    .name-feedback { min-height: 17px; margin-top: 5px; color: #64748b; font-size: 11px; font-weight: 700; }
     .sheet-overlay {
       position: absolute;
       inset: 0;
@@ -506,8 +515,8 @@
       <span>长按偷偷排气</span>
     </button>
     <div class="menu-row">
-      <button class="menu-btn" id="roles-btn" type="button">👤 角色</button>
-      <button class="menu-btn" id="leaderboard-btn" type="button">🏆 排行榜</button>
+      <button class="menu-btn" id="roles-btn" type="button">角色</button>
+      <button class="menu-btn" id="leaderboard-btn" type="button">排行榜</button>
     </div>
     <div class="play-count" id="play-count">奶家人到访次数：<b id="play-count-num">读取中</b></div>
     <div class="controls-hint">按住屏幕或空格键排气 • 松手立刻憋住伪装</div>
@@ -533,9 +542,16 @@
       </div>
       <div class="result-notice" id="unlock-notice"></div>
       <div class="result-notice muted" id="submit-notice"></div>
+      <div class="name-form" id="result-name-form" hidden>
+        <label for="result-name">给这局成绩留个名字</label>
+        <div class="name-entry">
+          <input id="result-name" type="text" maxlength="12" autocomplete="nickname" placeholder="输入你的名字">
+          <button id="submit-name-btn" type="button">提交成绩</button>
+        </div>
+        <p class="name-feedback" id="result-name-feedback">1～12 个字、字母或数字</p>
+      </div>
       <div class="menu-row result-actions">
-        <button class="menu-btn" id="result-roles-btn" type="button">👤 角色</button>
-        <button class="menu-btn" id="result-leaderboard-btn" type="button">🏆 排行榜</button>
+        <button class="menu-btn" id="result-leaderboard-btn" type="button">排行榜</button>
       </div>
       <button class="btn-restart" id="restart-btn">再来一局</button>
     </div>
@@ -551,8 +567,16 @@
 
   <div class="sheet-overlay" id="leaderboard-modal" role="dialog" aria-modal="true" aria-labelledby="leaderboard-title">
     <div class="sheet-card">
-      <div class="sheet-head"><h2 id="leaderboard-title">🏆 排行榜</h2><button class="sheet-close" type="button" data-close-sheet aria-label="关闭排行榜">×</button></div>
+      <div class="sheet-head"><h2 id="leaderboard-title">排行榜</h2><button class="sheet-close" type="button" data-close-sheet aria-label="关闭排行榜">×</button></div>
       <p class="sheet-subtitle">同一浏览器保留最高成绩 · 前 10 名</p>
+      <div class="name-form">
+        <label for="board-name">我的名字</label>
+        <div class="name-entry">
+          <input id="board-name" type="text" maxlength="12" autocomplete="nickname" placeholder="输入你的名字">
+          <button id="save-name-btn" type="button">保存名字</button>
+        </div>
+        <p class="name-feedback" id="board-name-feedback">留名后，成绩会显示在你的名字下</p>
+      </div>
       <div id="leaderboard-list" aria-live="polite"><div class="board-empty">读取中…</div></div>
       <div class="my-rank" id="my-rank">我的排名：读取中…</div>
     </div>
@@ -1030,6 +1054,11 @@ if (!/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(playerId || '')) {
   playerId = newPlayerId();
   saveValue('naiwa.playerId', playerId);
 }
+function cleanPlayerName(value) {
+  const name = String(value || '').trim().replace(/\s+/g, ' ');
+  return /^[\p{L}\p{N}_ -]{1,12}$/u.test(name) ? name : null;
+}
+let playerName = cleanPlayerName(savedValue('naiwa.playerName')) || '';
 let menuOpen = false;
 
 function renderRoles() {
@@ -1077,7 +1106,10 @@ function openSheet(id) {
   menuOpen = true;
   document.getElementById(id).classList.add('open');
   if (id === 'roles-modal') renderRoles();
-  if (id === 'leaderboard-modal') loadLeaderboard();
+  if (id === 'leaderboard-modal') {
+    document.getElementById('board-name').value = playerName;
+    loadLeaderboard();
+  }
 }
 function closeSheets() {
   document.querySelectorAll('.sheet-overlay.open').forEach((sheet) => sheet.classList.remove('open'));
@@ -1086,7 +1118,6 @@ function closeSheets() {
 }
 document.getElementById('roles-btn').addEventListener('click', () => openSheet('roles-modal'));
 document.getElementById('leaderboard-btn').addEventListener('click', () => openSheet('leaderboard-modal'));
-document.getElementById('result-roles-btn').addEventListener('click', () => openSheet('roles-modal'));
 document.getElementById('result-leaderboard-btn').addEventListener('click', () => openSheet('leaderboard-modal'));
 document.querySelectorAll('[data-close-sheet]').forEach((button) => button.addEventListener('click', closeSheets));
 document.querySelectorAll('.sheet-overlay').forEach((sheet) => sheet.addEventListener('click', (event) => {
@@ -1107,18 +1138,75 @@ async function boardRequest(body) {
 }
 let leaderboardRun = boardRequest({ action: 'start' }).then((data) => data.token);
 leaderboardRun.catch(() => {}); // 离线打开单文件时，排行榜不可用但游戏继续。
+let pendingScore = null;
+let submitInFlight = false;
 
 async function submitLeaderboard(finalScore) {
+  if (!playerName || submitInFlight) return;
+  submitInFlight = true;
   const notice = document.getElementById('submit-notice');
   notice.textContent = '成绩上传中…';
   try {
     const token = await leaderboardRun;
-    const board = await boardRequest({ action: 'submit', token, playerId, score: finalScore });
-    notice.textContent = board.mine ? `已记录最高成绩 · 当前第 ${board.mine.rank} 名` : '成绩已记录';
+    const submittedName = playerName;
+    let board = await boardRequest({ action: 'submit', token, playerId, name: submittedName, score: finalScore });
+    let nameSyncFailed = false;
+    if (playerName !== submittedName) {
+      try { board = await boardRequest({ action: 'rename', playerId, name: playerName }); }
+      catch (_) { nameSyncFailed = true; }
+    }
+    notice.textContent = board.mine
+      ? `${nameSyncFailed ? submittedName : playerName}，你的最高成绩排第 ${board.mine.rank} 名${nameSyncFailed ? '（改名待同步）' : ''}`
+      : '成绩已记录';
+    pendingScore = null;
+    document.getElementById('result-name-form').hidden = true;
     if (document.getElementById('leaderboard-modal').classList.contains('open')) renderLeaderboard(board);
   } catch (_) {
-    notice.textContent = '成绩暂未上传，可继续离线游玩';
+    notice.textContent = '成绩暂未上传，可重试提交';
+    document.getElementById('result-name-form').hidden = false;
+    document.getElementById('result-name').value = playerName;
+  } finally {
+    submitInFlight = false;
   }
+}
+
+async function savePlayerName(input, feedback) {
+  const name = cleanPlayerName(input.value);
+  if (!name) {
+    feedback.textContent = '请输入 1～12 个字、字母或数字';
+    input.focus();
+    return;
+  }
+  playerName = name;
+  saveValue('naiwa.playerName', name);
+  document.getElementById('board-name').value = name;
+  document.getElementById('result-name').value = name;
+  if (pendingScore !== null) {
+    feedback.textContent = '正在提交这局成绩…';
+    await submitLeaderboard(pendingScore);
+    feedback.textContent = pendingScore === null ? '成绩已提交' : '名字已保存，成绩待提交';
+    return;
+  }
+  feedback.textContent = '名字已保存';
+  try {
+    const board = await boardRequest({ action: 'rename', playerId, name });
+    if (document.getElementById('leaderboard-modal').classList.contains('open')) renderLeaderboard(board);
+    feedback.textContent = board.mine ? '榜上名字已更新' : '结算后会用这个名字上榜';
+  } catch (_) {
+    feedback.textContent = '已在本机保存，联网后随成绩更新';
+  }
+}
+document.getElementById('save-name-btn').addEventListener('click', () =>
+  savePlayerName(document.getElementById('board-name'), document.getElementById('board-name-feedback')));
+document.getElementById('submit-name-btn').addEventListener('click', () =>
+  savePlayerName(document.getElementById('result-name'), document.getElementById('result-name-feedback')));
+for (const id of ['board-name', 'result-name']) {
+  document.getElementById(id).addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      document.getElementById(id === 'board-name' ? 'save-name-btn' : 'submit-name-btn').click();
+    }
+  });
 }
 
 function renderLeaderboard(board) {
@@ -1196,13 +1284,13 @@ window.addEventListener('touchend', () => stopFart());
 window.addEventListener('touchcancel', () => stopFart());
 
 window.addEventListener('keydown', (e) => {
-  if (e.code === 'Space' && !e.repeat) {
+  if (e.code === 'Space' && !e.repeat && document.activeElement?.tagName !== 'INPUT') {
     e.preventDefault();
     startFart();
   }
 });
 window.addEventListener('keyup', (e) => {
-  if (e.code === 'Space') {
+  if (e.code === 'Space' && document.activeElement?.tagName !== 'INPUT') {
     e.preventDefault();
     stopFart();
   }
@@ -1983,7 +2071,12 @@ function gameOver(reason) {
   const newlyUnlocked = ROLE_DEFS.filter((role) => role.need > previousBest && role.need <= bestScore);
   document.getElementById('unlock-notice').textContent = newlyUnlocked.length
     ? `新角色解锁：${newlyUnlocked.map((role) => role.name).join('、')}！` : '';
-  submitLeaderboard(finalScore);
+  pendingScore = finalScore;
+  document.getElementById('result-name-form').hidden = !!playerName;
+  document.getElementById('result-name').value = playerName;
+  document.getElementById('result-name-feedback').textContent = '1～12 个字、字母或数字';
+  if (playerName) submitLeaderboard(finalScore);
+  else document.getElementById('submit-notice').textContent = '填写名字后，成绩会显示在排行榜上';
 
   const title = fartTitle(finalScore);
   if (title) {
@@ -2021,6 +2114,7 @@ function gameOver(reason) {
 
 restartBtn.addEventListener('click', () => {
   endModal.style.display = 'none';
+  if (!submitInFlight) pendingScore = null;
   isPlaying = true;
   isFarting = false;
   gasLevel = 25;
