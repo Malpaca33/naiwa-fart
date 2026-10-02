@@ -284,6 +284,8 @@
       padding: 26px 22px;
       width: 100%;
       max-width: 360px;
+      max-height: calc(100dvh - 32px);
+      overflow-y: auto;
       text-align: center;
       box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
     }
@@ -338,16 +340,18 @@
     .modal-stat-value.time { color: #2563eb; }
     .modal-stat-value.ml { color: #10b981; }
     .modal-stat-value em { font-size: 13px; font-style: normal; color: #94a3b8; margin-left: 2px; }
-    /* 换装：纯文字选项 */
-    .skin-row {
+    .menu-row {
       display: flex;
-      flex-wrap: wrap;
       justify-content: center;
-      gap: 6px;
+      gap: 8px;
       margin-top: 10px;
+      width: 100%;
     }
-    .skin-chip {
-      padding: 5px 13px;
+    .menu-btn {
+      min-width: 0;
+      flex: 1;
+      max-width: 180px;
+      padding: 7px 10px;
       border-radius: 16px;
       background: #f1f5f9;
       border: 1.5px solid #cbd5e1;
@@ -355,14 +359,53 @@
       font-size: 12.5px;
       font-weight: 800;
       cursor: pointer;
-      transition: all 0.15s ease;
     }
-    .skin-chip.on {
-      background: #dbeafe;
-      border-color: #3b82f6;
-      color: #1d4ed8;
+    .menu-btn:active { background: #dbeafe; }
+    .result-notice { font-size: 12px; font-weight: 800; color: #047857; min-height: 18px; margin: -10px 0 10px; }
+    .result-notice.muted { color: #64748b; }
+    .result-actions { margin: -8px 0 12px; }
+    .sheet-overlay {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 60;
+      background: rgba(15, 23, 42, 0.78);
+      backdrop-filter: blur(5px);
     }
-    /* 到访次数：跟换装胶囊并排，虚线边框表示这是信息而不是按钮 */
+    .sheet-overlay.open { display: flex; }
+    .sheet-card {
+      width: 100%;
+      max-width: 410px;
+      max-height: calc(100dvh - 32px);
+      overflow-y: auto;
+      background: #fff;
+      border-radius: 22px;
+      padding: 18px;
+      box-shadow: 0 20px 50px rgba(0,0,0,.3);
+    }
+    .sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .sheet-head h2 { font-size: 20px; color: #0f172a; }
+    .sheet-close { border: 0; border-radius: 50%; width: 32px; height: 32px; background: #f1f5f9; color: #334155; font-size: 20px; cursor: pointer; }
+    .sheet-subtitle { color: #64748b; font-size: 12px; font-weight: 700; margin: 8px 0 14px; }
+    .board-row { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 8px; padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 14px; font-weight: 800; }
+    .board-row.mine { background: #ecfdf5; border-radius: 10px; color: #047857; }
+    .board-score { color: #0284c7; font-variant-numeric: tabular-nums; }
+    .board-empty { text-align: center; color: #64748b; font-size: 13px; padding: 22px 8px; }
+    .my-rank { margin-top: 12px; padding: 10px 12px; background: #f1f5f9; border-radius: 12px; font-size: 13px; font-weight: 800; color: #334155; }
+    .roles-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .role-card { border: 2px solid #e2e8f0; background: #f8fafc; border-radius: 15px; padding: 9px; text-align: center; color: #334155; cursor: pointer; }
+    .role-card.selected { border-color: #10b981; background: #ecfdf5; }
+    .role-card.locked { cursor: default; color: #64748b; }
+    .role-image-wrap { display: flex; align-items: center; justify-content: center; height: 100px; position: relative; }
+    .role-image-wrap img { max-width: 90%; max-height: 95px; object-fit: contain; }
+    .role-card.locked img { filter: grayscale(1) brightness(0.24); opacity: .48; }
+    .role-lock { position: absolute; right: 8px; bottom: 0; font-size: 21px; }
+    .role-name { display: block; margin-top: 5px; font-size: 14px; font-weight: 900; }
+    .role-condition { display: block; margin-top: 3px; font-size: 11px; font-weight: 700; min-height: 28px; }
+    /* 到访次数独立一行；接口失败时也保留状态文字。 */
     .play-count {
       display: inline-flex;
       align-items: center;
@@ -462,11 +505,9 @@
       <span>💨</span>
       <span>长按偷偷排气</span>
     </button>
-    <div class="skin-row" id="skin-row">
-      <button class="skin-chip" data-skin="floral">花肚兜</button>
-      <button class="skin-chip" data-skin="luke">Luke</button>
-      <button class="skin-chip" data-skin="tea">冰红茶</button>
-      <button class="skin-chip" data-skin="secret">奶秘</button>
+    <div class="menu-row">
+      <button class="menu-btn" id="roles-btn" type="button">👤 角色</button>
+      <button class="menu-btn" id="leaderboard-btn" type="button">🏆 排行榜</button>
     </div>
     <div class="play-count" id="play-count">奶家人到访次数：<b id="play-count-num">读取中</b></div>
     <div class="controls-hint">按住屏幕或空格键排气 • 松手立刻憋住伪装</div>
@@ -490,7 +531,30 @@
           <span class="modal-stat-value ml" id="stat-score">0<em>ml</em></span>
         </div>
       </div>
+      <div class="result-notice" id="unlock-notice"></div>
+      <div class="result-notice muted" id="submit-notice"></div>
+      <div class="menu-row result-actions">
+        <button class="menu-btn" id="result-roles-btn" type="button">👤 角色</button>
+        <button class="menu-btn" id="result-leaderboard-btn" type="button">🏆 排行榜</button>
+      </div>
       <button class="btn-restart" id="restart-btn">再来一局</button>
+    </div>
+  </div>
+
+  <div class="sheet-overlay" id="roles-modal" role="dialog" aria-modal="true" aria-labelledby="roles-title">
+    <div class="sheet-card">
+      <div class="sheet-head"><h2 id="roles-title">奶蛙角色</h2><button class="sheet-close" type="button" data-close-sheet aria-label="关闭角色窗口">×</button></div>
+      <p class="sheet-subtitle" id="roles-progress">本机最高 0 ml · 达到称号后解锁</p>
+      <div class="roles-grid" id="roles-grid"></div>
+    </div>
+  </div>
+
+  <div class="sheet-overlay" id="leaderboard-modal" role="dialog" aria-modal="true" aria-labelledby="leaderboard-title">
+    <div class="sheet-card">
+      <div class="sheet-head"><h2 id="leaderboard-title">🏆 排行榜</h2><button class="sheet-close" type="button" data-close-sheet aria-label="关闭排行榜">×</button></div>
+      <p class="sheet-subtitle">同一浏览器保留最高成绩 · 前 10 名</p>
+      <div id="leaderboard-list" aria-live="polite"><div class="board-empty">读取中…</div></div>
+      <div class="my-rank" id="my-rank">我的排名：读取中…</div>
     </div>
   </div>
 </div>
@@ -873,6 +937,7 @@ let nextNpcCheckTimer = 4.0;
 
 let greenFartParticles = [];
 let sweatDrops = [];
+let lastParticleDraw = performance.now();
 
 /* 绿色浓烟使用独立残留量；刮风只清雾，不扣累计得分。 */
 const GREEN_FOG_FULL_ML = 4000;
@@ -933,11 +998,173 @@ const SKIN_SPRITES = {
 let activeSkin = null;
 let comboCount = 0;         // 掩护期内连续起手的次数
 
+/* 角色靠历史最高成绩解锁；原味奶蛙始终可选。 */
+const ROLE_DEFS = [
+  { key: null, name: '原味奶蛙', need: 0, title: '初始角色', sprite: spriteIdle },
+  { key: 'floral', name: '花肚兜', need: 666, title: '无声屁徒', sprite: spriteSkinFloral },
+  { key: 'luke', name: 'Luke', need: 1000, title: '连环屁王', sprite: spriteSkinLuke },
+  { key: 'tea', name: '冰红茶', need: 2026, title: '单人乐队', sprite: spriteSkinTea },
+  { key: 'secret', name: '奶秘', need: 4399, title: '人间大炮', sprite: spriteSkinSecret },
+];
+function savedValue(key) {
+  try { return localStorage.getItem(key); } catch (_) { return null; }
+}
+function saveValue(key, value) {
+  try { localStorage.setItem(key, String(value)); } catch (_) { /* 无痕模式仍可玩 */ }
+}
+let bestScore = Math.max(0, Number.parseInt(savedValue('naiwa.bestScore') || '0', 10) || 0);
+const savedSkin = savedValue('naiwa.activeSkin');
+if (ROLE_DEFS.some((role) => role.key === savedSkin && bestScore >= role.need)) activeSkin = savedSkin;
+
+function newPlayerId() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  bytes[6] = (bytes[6] & 15) | 64;
+  bytes[8] = (bytes[8] & 63) | 128;
+  const hex = Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+}
+let playerId = savedValue('naiwa.playerId');
+if (!/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(playerId || '')) {
+  playerId = newPlayerId();
+  saveValue('naiwa.playerId', playerId);
+}
+let menuOpen = false;
+
+function renderRoles() {
+  document.getElementById('roles-progress').textContent = `本机最高 ${bestScore.toLocaleString()} ml · 达到称号后解锁`;
+  const grid = document.getElementById('roles-grid');
+  grid.replaceChildren();
+  for (const role of ROLE_DEFS) {
+    const locked = bestScore < role.need;
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = `role-card${locked ? ' locked' : ''}${activeSkin === role.key ? ' selected' : ''}`;
+    card.disabled = locked;
+    card.setAttribute('aria-label', locked ? `${role.name}，获得${role.title}解锁，需要${role.need}毫升` : `${role.name}${activeSkin === role.key ? '，当前角色' : '，选择'}`);
+    const wrap = document.createElement('span');
+    wrap.className = 'role-image-wrap';
+    const image = document.createElement('img');
+    image.src = role.sprite.src;
+    image.alt = '';
+    wrap.appendChild(image);
+    if (locked) {
+      const lock = document.createElement('span');
+      lock.className = 'role-lock';
+      lock.textContent = '🔒';
+      wrap.appendChild(lock);
+    }
+    const name = document.createElement('span');
+    name.className = 'role-name';
+    name.textContent = role.name;
+    const condition = document.createElement('span');
+    condition.className = 'role-condition';
+    condition.textContent = locked ? `${role.need} ml · ${role.title}解锁`
+      : activeSkin === role.key ? '使用中' : '已解锁 · 点击使用';
+    card.append(wrap, name, condition);
+    if (!locked) card.addEventListener('click', () => {
+      activeSkin = role.key;
+      saveValue('naiwa.activeSkin', role.key || '');
+      renderRoles();
+    });
+    grid.appendChild(card);
+  }
+}
+
+function openSheet(id) {
+  stopFart();
+  menuOpen = true;
+  document.getElementById(id).classList.add('open');
+  if (id === 'roles-modal') renderRoles();
+  if (id === 'leaderboard-modal') loadLeaderboard();
+}
+function closeSheets() {
+  document.querySelectorAll('.sheet-overlay.open').forEach((sheet) => sheet.classList.remove('open'));
+  menuOpen = false;
+  lastFrameTime = performance.now();
+}
+document.getElementById('roles-btn').addEventListener('click', () => openSheet('roles-modal'));
+document.getElementById('leaderboard-btn').addEventListener('click', () => openSheet('leaderboard-modal'));
+document.getElementById('result-roles-btn').addEventListener('click', () => openSheet('roles-modal'));
+document.getElementById('result-leaderboard-btn').addEventListener('click', () => openSheet('leaderboard-modal'));
+document.querySelectorAll('[data-close-sheet]').forEach((button) => button.addEventListener('click', closeSheets));
+document.querySelectorAll('.sheet-overlay').forEach((sheet) => sheet.addEventListener('click', (event) => {
+  if (event.target === sheet) closeSheets();
+}));
+window.addEventListener('keydown', (event) => { if (event.key === 'Escape' && menuOpen) closeSheets(); });
+
+async function boardRequest(body) {
+  const response = await fetch('/api/leaderboard', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+    cache: 'no-store',
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || '排行榜暂不可用');
+  return data;
+}
+let leaderboardRun = boardRequest({ action: 'start' }).then((data) => data.token);
+leaderboardRun.catch(() => {}); // 离线打开单文件时，排行榜不可用但游戏继续。
+
+async function submitLeaderboard(finalScore) {
+  const notice = document.getElementById('submit-notice');
+  notice.textContent = '成绩上传中…';
+  try {
+    const token = await leaderboardRun;
+    const board = await boardRequest({ action: 'submit', token, playerId, score: finalScore });
+    notice.textContent = board.mine ? `已记录最高成绩 · 当前第 ${board.mine.rank} 名` : '成绩已记录';
+    if (document.getElementById('leaderboard-modal').classList.contains('open')) renderLeaderboard(board);
+  } catch (_) {
+    notice.textContent = '成绩暂未上传，可继续离线游玩';
+  }
+}
+
+function renderLeaderboard(board) {
+  const list = document.getElementById('leaderboard-list');
+  list.replaceChildren();
+  if (!board.top || board.top.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'board-empty';
+    empty.textContent = '还没有成绩，等你来占第一名。';
+    list.appendChild(empty);
+  } else {
+    for (const entry of board.top) {
+      const row = document.createElement('div');
+      row.className = `board-row${entry.mine ? ' mine' : ''}`;
+      for (const value of [String(entry.rank), entry.name, `${Number(entry.score).toLocaleString()} ml`]) {
+        const span = document.createElement('span');
+        span.textContent = value;
+        row.appendChild(span);
+      }
+      row.lastChild.className = 'board-score';
+      list.appendChild(row);
+    }
+  }
+  document.getElementById('my-rank').textContent = board.mine
+    ? `我的最高：${Number(board.mine.score).toLocaleString()} ml · 第 ${board.mine.rank} 名`
+    : '我的排名：完成一局后出现';
+}
+
+async function loadLeaderboard() {
+  document.getElementById('leaderboard-list').textContent = '读取中…';
+  document.getElementById('my-rank').textContent = '我的排名：读取中…';
+  try {
+    const response = await fetch(`/api/leaderboard?playerId=${encodeURIComponent(playerId)}`, { cache: 'no-store' });
+    if (!response.ok) throw new Error('读取失败');
+    renderLeaderboard(await response.json());
+  } catch (_) {
+    document.getElementById('leaderboard-list').textContent = '排行榜暂时无法读取';
+    document.getElementById('my-rank').textContent = '网络恢复后再来看看';
+  }
+}
+
 /* ==========================================================================
    Input Handling (去掉了 Release，纯按住排气)
    ========================================================================== */
 function startFart() {
-  if (!isPlaying) return;
+  if (!isPlaying || menuOpen) return;
   sounds.init();
   if (!isFarting) {
     isFarting = true;
@@ -1071,13 +1298,16 @@ function triggerMegaFart() {
 }
 
 function updateAndDrawParticles() {
+  const now = performance.now();
+  const frameScale = Math.min(6, Math.max(0, (now - lastParticleDraw) / (1000 / 60)));
+  lastParticleDraw = now;
   // Green Clouds
   for (let i = greenFartParticles.length - 1; i >= 0; i--) {
     const p = greenFartParticles[i];
-    p.x += p.vx + (isCoverActive ? 7 : 0);
-    p.y += p.vy;
-    p.radius += isCoverActive ? 1.0 : 0.6;
-    p.alpha -= isCoverActive ? 0.035 : 0.022;
+    p.x += (p.vx + (isCoverActive ? 7 : 0)) * frameScale;
+    p.y += p.vy * frameScale;
+    p.radius += (isCoverActive ? 1.0 : 0.6) * frameScale;
+    p.alpha -= (isCoverActive ? 0.035 : 0.022) * frameScale;
 
     if (p.alpha <= 0) {
       greenFartParticles.splice(i, 1);
@@ -1095,8 +1325,8 @@ function updateAndDrawParticles() {
   // Sweat Drops
   for (let i = sweatDrops.length - 1; i >= 0; i--) {
     const s = sweatDrops[i];
-    s.y += s.vy;
-    s.alpha -= 0.035;
+    s.y += s.vy * frameScale;
+    s.alpha -= 0.035 * frameScale;
 
     if (s.alpha <= 0) {
       sweatDrops.splice(i, 1);
@@ -1127,7 +1357,7 @@ function update(dt) {
     if (bt2.age >= BYSTANDER_LINE_LIFE) bystanderTexts.splice(i, 1);
   }
 
-  if (!isPlaying) return;
+  if (!isPlaying || menuOpen) return;
 
   elapsedSeconds += dt;
 
@@ -1452,13 +1682,14 @@ function render() {
   // 奶蛋的视线从侧身图的眼睛出发，柔和地扫过奶蛙身体。
   let scanSpot = null;
   if (npcState === NPC_STATES.WATCHING) {
-    const eggH = 232;
+    const eggH = Math.min(232, Math.max(105, pondY - 12 - 70));
     const eggW = eggSide.naturalWidth && eggSide.naturalHeight
       ? eggH * eggSide.naturalWidth / eggSide.naturalHeight : 143;
     const eyeX = width * 0.76 - eggW * 0.2;
     const eyeY = pondY - 12 - eggH * 0.61;
     const frogX = width * 0.32 + 14;
-    const frogY = pondY - 14 - 248 * visualGasScale
+    const frogHeight = Math.min(248, Math.max(95, (pondY - 14 - 70) / 1.1)) * visualGasScale;
+    const frogY = pondY - 14 - frogHeight
       * (0.50 + Math.sin(Date.now() * 0.0025) * 0.14);
     drawScanBeam(eyeX, eyeY, frogX, frogY, awarenessTier());
     scanSpot = { x: frogX, y: frogY };
@@ -1499,7 +1730,8 @@ function render() {
       ctx.translate(playerX * 2, 0);
       ctx.scale(-1, 1);
     }
-    const box = drawChar(spriteFart, playerX, playerY, 238 * visualGasScale, 0.58, wx, wy);
+    const fartHeight = Math.min(238, Math.max(95, (playerY - 70) / 1.1)) * visualGasScale;
+    const box = drawChar(spriteFart, playerX, playerY, fartHeight, 0.58, wx, wy);
     ctx.restore();
     if (box) {
       // 粒子直接生在「精灵图里已经画好的那团尾气」范围上，新烟与自带的尾气
@@ -1523,13 +1755,15 @@ function render() {
     const skinImg = activeSkin ? SKIN_SPRITES[activeSkin] : null;
     const idleImg = (skinImg && skinImg.complete && skinImg.naturalWidth)
       ? skinImg : spriteIdle;
-    drawChar(idleImg, playerX, playerY, 248 * visualGasScale, 0.5, tremX, 0);
+    const idleHeight = Math.min(248, Math.max(95, (playerY - 70) / 1.1)) * visualGasScale;
+    drawChar(idleImg, playerX, playerY, idleHeight, 0.5, tremX, 0);
   }
   if (scanSpot) drawScanSpot(scanSpot.x, scanSpot.y, awarenessTier());
 
   // 2. 右侧监视者奶蛋：三态对应三视图（背对 → 猛地转正 → 侧身锁定玩家）
   const npcX = width * 0.76;
   const npcY = pondY - 12;
+  const npcHeight = Math.min(232, Math.max(105, npcY - 70));
 
   ctx.save();
   ctx.fillStyle = "rgba(92, 64, 38, 0.20)";
@@ -1547,15 +1781,15 @@ function render() {
     ctx.translate(npcX, npcY);
     ctx.rotate(Math.sin(Date.now() * 0.017) * 0.14);
     ctx.translate(-npcX, -npcY);
-    npcBox = drawChar(eggBack, npcX, npcY, 232, 0.5, 0, 0);
+    npcBox = drawChar(eggBack, npcX, npcY, npcHeight, 0.5, 0, 0);
     ctx.restore();
   } else {
-    npcBox = drawChar(npcImg, npcX, npcY, 232, 0.5, 0, 0);
+    npcBox = drawChar(npcImg, npcX, npcY, npcHeight, 0.5, 0, 0);
   }
 
   // 头顶提示符号：直接显示 emoji（不加边框），水平居中于奶蛋头顶。
   // 竖直方向夹在 SCOREBOARD_SAFE_Y 以下，避免和顶部的「排气量」得分板叠在一起。
-  const npcTop = npcBox ? npcBox.y : npcY - 232;
+  const npcTop = npcBox ? npcBox.y : npcY - npcHeight;
   const GLYPH_HALF = 38;
   const SCOREBOARD_SAFE_Y = 108;  // 得分板下沿 + 余量（canvas 坐标）
   if (npcState === NPC_STATES.QUESTION || npcState === NPC_STATES.WATCHING) {
@@ -1667,18 +1901,18 @@ function render() {
   const fog = Math.min(1, greenFogMl / GREEN_FOG_FULL_ML);
   if (fog > 0.002) {
     ctx.save();
-    ctx.fillStyle = `rgba(83, 172, 74, ${fog * fog * 0.10})`;
+    ctx.fillStyle = `rgba(83, 172, 74, ${fog * fog * 0.04})`;
     ctx.fillRect(0, 0, width, height);
     const ft = Date.now() * 0.00023;
     const colors = ['104,187,54', '51,171,80', '164,209,58', '35,139,84'];
-    for (let i = 0; i < 22; i++) {
+    for (let i = 0; i < 13; i++) {
       const fx = width * (0.11 + ((i * 37) % 79) / 100)
                + Math.sin(ft + i * 0.9) * 12 + (isCoverActive ? width * 0.12 : 0);
       const fy = height * (0.19 + ((i * 23) % 76) / 100)
                + Math.cos(ft * 1.2 + i) * 9;
-      const radius = Math.min(width, height) * (0.26 + (i % 4) * 0.045);
+      const radius = Math.min(width, height) * (0.23 + (i % 4) * 0.055);
       const color = colors[i % colors.length];
-      const alpha = fog * (0.31 + (i % 3) * 0.045);
+      const alpha = fog * (0.37 + (i % 3) * 0.055);
       const rg = ctx.createRadialGradient(fx, fy, 0, fx, fy, radius);
       rg.addColorStop(0, `rgba(${color},${alpha})`);
       rg.addColorStop(0.46, `rgba(${color},${alpha * 0.47})`);
@@ -1689,7 +1923,7 @@ function render() {
       ctx.fill();
     }
     // 4000 ml 才到完全遮蔽极限；此前始终有浓淡层次。
-    ctx.fillStyle = `rgba(52, 132, 63, ${Math.pow(fog, 14)})`;
+    ctx.fillStyle = `rgba(52, 132, 63, ${Math.pow(fog, 72)})`;
     ctx.fillRect(0, 0, width, height);
     ctx.restore();
   }
@@ -1740,7 +1974,18 @@ function gameOver(reason) {
   isFarting = false;
   fartBtn.classList.remove('active');
 
-  const title = fartTitle(Math.floor(score));
+  const finalScore = Math.floor(score);
+  const previousBest = bestScore;
+  if (finalScore > bestScore) {
+    bestScore = finalScore;
+    saveValue('naiwa.bestScore', bestScore);
+  }
+  const newlyUnlocked = ROLE_DEFS.filter((role) => role.need > previousBest && role.need <= bestScore);
+  document.getElementById('unlock-notice').textContent = newlyUnlocked.length
+    ? `新角色解锁：${newlyUnlocked.map((role) => role.name).join('、')}！` : '';
+  submitLeaderboard(finalScore);
+
+  const title = fartTitle(finalScore);
   if (title) {
     modalRank.textContent = title;
     modalRank.style.display = 'inline-block';
@@ -1748,7 +1993,7 @@ function gameOver(reason) {
     modalRank.style.display = 'none';
   }
   statTime.textContent = `${fartSeconds.toFixed(1)}s`;
-  statScore.innerHTML = `${Math.floor(score).toLocaleString()}<em>ml</em>`;
+  statScore.innerHTML = `${finalScore.toLocaleString()}<em>ml</em>`;
   // 结算立绘跟着结局走：炸了就用放屁形态，被抓就保持静态
   modalFrog.src = reason === 'exploded' ? spriteFart.src : spriteIdle.src;
 
@@ -1773,18 +2018,6 @@ function gameOver(reason) {
 
   endModal.style.display = 'flex';
 }
-
-/* 换装：点某项即换，再点当前项回到原样 */
-document.querySelectorAll('.skin-chip').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    sounds.init();                     // 借这次点击解锁音频上下文
-    const key = btn.dataset.skin;
-    activeSkin = (activeSkin === key) ? null : key;
-    document.querySelectorAll('.skin-chip').forEach((b) => {
-      b.classList.toggle('on', b.dataset.skin === activeSkin);
-    });
-  });
-});
 
 restartBtn.addEventListener('click', () => {
   endModal.style.display = 'none';
@@ -1821,7 +2054,10 @@ restartBtn.addEventListener('click', () => {
   comboCount = 0;
   greenFartParticles = [];
   sweatDrops = [];
+  lastParticleDraw = performance.now();
   lastFrameTime = performance.now();
+  leaderboardRun = boardRequest({ action: 'start' }).then((data) => data.token);
+  leaderboardRun.catch(() => {});
 });
 
 </script>

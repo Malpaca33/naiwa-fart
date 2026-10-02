@@ -8,3 +8,8 @@ compatibility_date = "2026-10-01"
 [[kv_namespaces]]
 binding = "PLAY_COUNTER"
 id = "01e0d40dd26241728f478c9a55747530"
+
+[[d1_databases]]
+binding = "LEADERBOARD_DB"
+database_name = "naiwa-fart-leaderboard"
+database_id = "e06f0ada-4703-4eec-ada9-8570cfaeeecf"

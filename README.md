@@ -20,7 +20,9 @@ https://naiwa-fart.pages.dev
 - 被奶蛋抓现行，同样结束。
 - 奶蛋转身后要愣 0.45 秒才认得出。这 0.45 秒就是你的松手窗口。
 - 每累计 500 毫升排气量，自动爆一个超级大屁，把奶蛋震晕 3 秒。
-- 排气量攒到 3000 毫升，画面会被自己的绿烟糊死。
+- 残留绿雾到 4000 毫升时最浓；起风会吹散一部分，但不会扣累计得分。
+- 结算后自动把本局成绩送上排行榜；同一浏览器在榜上保留最高分。
+- 达到指定称号后，角色窗口会解锁对应形象。本机记住历史最高分与当前形象。
 
 ## 截图
 
@@ -32,19 +34,19 @@ https://naiwa-fart.pages.dev
 
 ### 绿色浓烟
 
-放屁量越攒越多，画面被自己的屁一层层糊住。到 3000 毫升完全看不见。
+残留绿雾会逐渐变浓，到 4000 毫升达到上限；起风会吹散一部分。
 
 ![绿色浓烟](screenshots/03-green-fog.png)
 
 ### 结算
 
-按最终排气量给出称号，八档。图中 8888 毫升对应「单人乐队」。
+按最终排气量给出称号，六档。历史最高分也用于解锁角色。
 
 ![结算界面](screenshots/04-result.png)
 
-### 换装
+### 角色与排行榜
 
-底部四个文字选项，点一下换，再点当前项回到原样。
+底部「角色」窗口展示原味奶蛙与四套可解锁形象，未解锁的角色以灰色轮廓显示。四套形象分别在 666、1000、2026、4399 ml 解锁。底部「排行榜」展示前 10 名和自己的最高分与排名，玩家使用自动生成的匿名代号。
 
 ![四套换装](screenshots/05-skins.png)
 
@@ -57,18 +59,20 @@ https://naiwa-fart.pages.dev
 ## 技术特点
 
 - **单文件，零依赖**。精灵图内嵌为 base64，音效用 Web Audio 实时合成。
-- **没有构建步骤**。源文件双击就能玩，离线可用。
-- 全部逻辑在一个 HTML 文件里，约 1700 行。
-- 计数后端用 Cloudflare Pages Functions。数据存在 KV 里，不引第三方统计。
+- **无需本地构建工具**。源文件双击就能玩，离线时排行榜与到访人数不可用。
+- 前端逻辑在一个 HTML 文件里。
+- 到访计数使用 Pages Functions + KV，排行榜使用 Pages Functions + D1。
 
 ## 本地运行
 
 直接双击 `奶蛙偷偷放屁.html` 即可。
 
-调试计数接口时需要本地服务：
+调试计数与排行榜接口时，先构建，再启动本地 Pages 环境：
 
 ```bash
-python3 -m http.server 8878 --directory public
+./tools/build.sh
+npx --yes wrangler@4 d1 migrations apply naiwa-fart-leaderboard --local
+npx --yes wrangler@4 pages dev --port 8788
 ```
 
 ## 部署
@@ -89,8 +93,10 @@ naiwa-fart/
 ├── HANDOVER.md              # 完整交接文档
 ├── README.md
 ├── public/                  # 构建产物，交给 Cloudflare
-├── functions/api/plays.js   # 计数接口
-├── wrangler.toml            # Pages 配置与 KV 绑定
+├── functions/api/plays.js   # 到访计数接口
+├── functions/api/leaderboard.js # 排行榜接口
+├── migrations/              # 排行榜 D1 建表
+├── wrangler.toml            # Pages 配置与 KV、D1 绑定
 ├── assets/
 │   ├── appicon/             # App 图标与 manifest
 │   ├── src/                 # 抠好的原始素材
@@ -110,10 +116,11 @@ naiwa-fart/
 ```js
 const NPC_TUNING = {
   patrolMin: 3.2, patrolMax: 6.0,          // 发呆巡逻间隔（秒）
-  idleToSusMin: 0.85, idleToSusMax: 1.40,  // 发呆 → 起疑
-  susToWatchMin: 1.10, susToWatchMax: 1.70,// 起疑 → 抓现行
-  reactDelay: 0.45,                        // 转身后愣多久才认得出
-  suspicionRate: 62,                       // 安静期怀疑度增速
+  questionMin: 0.85, questionMax: 1.40,    // 问号停留
+  turningMin: 0.55, turningMax: 0.85,      // 正面转身停留
+  watchingMin: 1.10, watchingMax: 1.70,    // 扫描持续
+  reactDelay: 0.45,                        // 扫描开始后的松手窗口
+  suspicionRate: 40,                       // 安静期警觉增速
 };
 ```
 
@@ -130,7 +137,7 @@ const NPC_TUNING = {
 | 起风间隔 | 7 到 13 秒 | 随机 |
 | `MEGA_FART_STEP` | 500 毫升 | 超级大屁的触发间隔 |
 | `NPC_STUN_TIME` | 3.0 秒 | 震晕奶蛋的时长 |
-| `GREEN_FOG_FULL_ML` | 3000 毫升 | 绿烟完全遮住画面的阈值 |
+| `GREEN_FOG_FULL_ML` | 4000 毫升 | 残留绿雾浓度上限 |
 
 ### 称号
 
@@ -138,14 +145,12 @@ const NPC_TUNING = {
 
 | 排气量 | 称号 |
 | --- | --- |
-| 233 | 静音 |
-| 666 | 气微 |
-| 2026 | 闷雷 |
+| 666 | 无声屁徒 |
+| 1000 | 连环屁王 |
+| 2026 | 单人乐队 |
 | 4399 | 人间大炮 |
-| 8888 | 单人乐队 |
-| 19988 | 真の屁王 |
-| 54321 | 虚空屁神 |
-| 88001 | 根本没有这样的屁 |
+| 6666 | 真の屁王 |
+| 8888 | 虚空屁神 |
 
 ## 换素材
 
