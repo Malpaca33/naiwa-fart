@@ -1126,17 +1126,31 @@ document.querySelectorAll('.sheet-overlay').forEach((sheet) => sheet.addEventLis
 window.addEventListener('keydown', (event) => { if (event.key === 'Escape' && menuOpen) closeSheets(); });
 
 async function boardRequest(body) {
-  const response = await fetch('/api/leaderboard', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-    cache: 'no-store',
-  });
-  const data = await response.json();
+  let response;
+  try {
+    response = await fetch('/api/leaderboard', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      cache: 'no-store',
+    });
+  } catch (_) {
+    throw new Error('网络连接失败');
+  }
+  const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || '排行榜暂不可用');
   return data;
 }
-let leaderboardRun = boardRequest({ action: 'start' }).then((data) => data.token);
+async function startLeaderboardRun() {
+  let lastError;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try { return (await boardRequest({ action: 'start' })).token; }
+    catch (error) { lastError = error; }
+    if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+  }
+  throw new Error(`本局开局登记失败：${lastError.message}`);
+}
+let leaderboardRun = startLeaderboardRun();
 leaderboardRun.catch(() => {}); // 离线打开单文件时，排行榜不可用但游戏继续。
 let pendingScore = null;
 let submitInFlight = false;
@@ -1161,8 +1175,8 @@ async function submitLeaderboard(finalScore) {
     pendingScore = null;
     document.getElementById('result-name-form').hidden = true;
     if (document.getElementById('leaderboard-modal').classList.contains('open')) renderLeaderboard(board);
-  } catch (_) {
-    notice.textContent = '成绩暂未上传，可重试提交';
+  } catch (error) {
+    notice.textContent = `成绩暂未上传：${error.message}。可重试提交`;
     document.getElementById('result-name-form').hidden = false;
     document.getElementById('result-name').value = playerName;
   } finally {
@@ -2150,7 +2164,7 @@ restartBtn.addEventListener('click', () => {
   sweatDrops = [];
   lastParticleDraw = performance.now();
   lastFrameTime = performance.now();
-  leaderboardRun = boardRequest({ action: 'start' }).then((data) => data.token);
+  leaderboardRun = startLeaderboardRun();
   leaderboardRun.catch(() => {});
 });
 

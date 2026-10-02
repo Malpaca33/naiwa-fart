@@ -92,8 +92,9 @@ export async function onRequest(context) {
     const now = Math.floor(Date.now() / 1000);
     const duration = now - run.started_at;
     // 游戏计分最高为起风时的 70 × 1.8 = 126 ml/s，宽限网络与整数计时误差。
-    if (duration < 0 || duration > 3600 || body.score > Math.floor(126 * (duration + 3) + 20)) {
-      return json({ error: '成绩与本局时长不符' }, 422);
+    if (duration < 0 || duration > 86400) return json({ error: '本局开局记录已过期' }, 422);
+    if (body.score > Math.floor(126 * (duration + 3) + 20)) {
+      return json({ error: '成绩超过本局登记时长允许值' }, 422);
     }
     const claimed = await env.LEADERBOARD_DB.prepare(
       'UPDATE leaderboard_runs SET submitted_at = unixepoch() WHERE token = ? AND submitted_at IS NULL'

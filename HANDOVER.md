@@ -392,6 +392,7 @@ io.open('/tmp/gc.js','w',encoding='utf-8').write(re.findall(r'<script>(.*?)</scr
 排行榜接口在 `functions/api/leaderboard.js`，绑定 `LEADERBOARD_DB`。D1 表结构在 `migrations/0001_leaderboard.sql`，名字字段在 `migrations/0002_player_names.sql`。线上库名 `naiwa-fart-leaderboard`；新环境首次部署前运行 `npx --yes wrangler@4 d1 migrations apply naiwa-fart-leaderboard --remote`。
 
 - `POST /api/leaderboard` 的 `action: "start"` 发一枚本局令牌；结算时 `action: "submit"` 携令牌、浏览器 ID、玩家名字和整数分数。令牌只能提交一次，服务端按本局经过的真实时间校验最高理论分数。没留名字时，结算页先显示输入框，不自动上传。
+- 开局登记遇到短暂网络故障会重试三次；结算上传失败时显示接口返回的原因，便于区分网络错误、开局登记失败和分数校验失败。登记有效时长放宽至 24 小时，避免页面打开超过一小时后合法成绩被拒。
 - `POST /api/leaderboard` 的 `action: "rename"` 用浏览器 ID 更新已上榜记录的名字；没有历史记录时，名字先留在本机，结算上传时使用。
 - `GET /api/leaderboard?playerId=...` 返回前 10 名以及这个浏览器自己的最高分和排名。每个 ID 只保留最高分；同分并列。名字限 1～12 个字、字母、数字、空格、下划线或连字符，页面以 `textContent` 显示。未留名的旧记录仍显示「奶家人」加 ID 前六位。
 - `naiwa.playerId`、`naiwa.playerName`、`naiwa.bestScore`、`naiwa.activeSkin` 放在浏览器 `localStorage`。清理浏览器网站数据会丢失本机解锁和身份；换设备也不会同步。离线单文件仍可玩，只是排行榜和到访接口不可用。
